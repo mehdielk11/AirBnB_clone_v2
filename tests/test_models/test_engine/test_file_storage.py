@@ -1,152 +1,139 @@
 #!/usr/bin/python3
-'''
-    Testing the file_storage module.
-'''
+"""
+Contains the TestFileStorageDocs classes
+"""
 
-import os
-import time
-import json
-import unittest
-from models.base_model import BaseModel
-from models.state import State
-from models.engine.file_storage import FileStorage
+from datetime import datetime
+import inspect
 import models
+from models.engine import file_storage
+from models.amenity import Amenity
+from models.base_model import BaseModel
+from models.city import City
+from models.place import Place
+from models.review import Review
+from models.state import State
+from models.user import User
+import json
+import os
+import pep8
+import unittest
+FileStorage = file_storage.FileStorage
+classes = {"Amenity": Amenity, "BaseModel": BaseModel, "City": City,
+           "Place": Place, "Review": Review, "State": State, "User": User}
 
 
-class testFileStorage(unittest.TestCase):
-    '''
-        Testing the FileStorage class
-    '''
+class TestFileStorageDocs(unittest.TestCase):
+    """Tests to check the documentation and style of FileStorage class"""
+    @classmethod
+    def setUpClass(cls):
+        """Set up for the doc tests"""
+        cls.fs_f = inspect.getmembers(FileStorage, inspect.isfunction)
 
-    def setUp(self):
-        '''
-            Initializing classes
-        '''
-        os.environ['HBNB_TYPE_STORAGE'] = 'file'
-        self.storage = FileStorage()
-        self.my_model = BaseModel()
+    def test_pep8_conformance_file_storage(self):
+        """Test that models/engine/file_storage.py conforms to PEP8."""
+        pep8s = pep8.StyleGuide(quiet=True)
+        result = pep8s.check_files(['models/engine/file_storage.py'])
+        self.assertEqual(result.total_errors, 0,
+                         "Found code style errors (and warnings).")
 
-    def tearDown(self):
-        '''
-            Cleaning up.
-        '''
+    def test_pep8_conformance_test_file_storage(self):
+        """Test tests/test_models/test_file_storage.py conforms to PEP8."""
+        pep8s = pep8.StyleGuide(quiet=True)
+        result = pep8s.check_files(['tests/test_models/test_engine/\
+test_file_storage.py'])
+        self.assertEqual(result.total_errors, 0,
+                         "Found code style errors (and warnings).")
 
-        try:
-            os.remove("file.json")
-        except FileNotFoundError:
-            pass
+    def test_file_storage_module_docstring(self):
+        """Test for the file_storage.py module docstring"""
+        self.assertIsNot(file_storage.__doc__, None,
+                         "file_storage.py needs a docstring")
+        self.assertTrue(len(file_storage.__doc__) >= 1,
+                        "file_storage.py needs a docstring")
 
-    def test_FileStorage_all_return_type(self):
-        '''
-            Tests the data type of the return value of the all method.
-        '''
-        storage_all = self.storage.all()
-        self.assertIsInstance(storage_all, dict)
+    def test_file_storage_class_docstring(self):
+        """Test for the FileStorage class docstring"""
+        self.assertIsNot(FileStorage.__doc__, None,
+                         "FileStorage class needs a docstring")
+        self.assertTrue(len(FileStorage.__doc__) >= 1,
+                        "FileStorage class needs a docstring")
 
-    def test_FileStorage_all_class_specific(self):
-        '''
-            Test all method with a class specified
-        '''
-        new_city = models.City()
-        new_state = models.State()
-        state_key = str(new_state.__class__.__name__) + "." + str(new_state.id)
-        city_key = str(new_city.__class__.__name__) + "." + str(new_city.id)
-        self.storage.new(new_city)
-        self.storage.new(new_state)
-        tmp = self.storage.all(models.City)
-        state = tmp.get(state_key, None)
-        city = tmp.get(city_key, None)
-        self.assertTrue(city is not None, msg="\n{}\n{}".format(tmp, city))
-        self.assertTrue(state is None)
+    def test_fs_func_docstrings(self):
+        """Test for the presence of docstrings in FileStorage methods"""
+        for func in self.fs_f:
+            self.assertIsNot(func[1].__doc__, None,
+                             "{:s} method needs a docstring".format(func[0]))
+            self.assertTrue(len(func[1].__doc__) >= 1,
+                            "{:s} method needs a docstring".format(func[0]))
 
-    def test_FileStorage_new_method(self):
-        '''
-            Tests that the new method sets the right key and value pair
-            in the FileStorage.__object attribute
-        '''
-        self.storage.new(self.my_model)
-        key = str(self.my_model.__class__.__name__) + "." + self.my_model.id
-        self.assertTrue(key in self.storage._FileStorage__objects)
 
-    def test_FileStorage_objects_value_type(self):
-        '''
-            Tests that the type of value contained in the FileStorage.__object
-            is of type obj.__class__.__name__
-        '''
-        self.storage.new(self.my_model)
-        key = str(self.my_model.__class__.__name__) + "." + self.my_model.id
-        val = self.storage._FileStorage__objects[key]
-        self.assertIsInstance(self.my_model, type(val))
+class TestFileStorage(unittest.TestCase):
+    """Test the FileStorage class"""
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
+    def test_all_returns_dict(self):
+        """Test that all returns the FileStorage.__objects attr"""
+        storage = FileStorage()
+        new_dict = storage.all()
+        self.assertEqual(type(new_dict), dict)
+        self.assertIs(new_dict, storage._FileStorage__objects)
 
-    def test_FileStorage_save_file_exists(self):
-        '''
-            Tests that a file gets created with the name file.json
-        '''
-        self.storage.save()
-        self.assertTrue(os.path.isfile("file.json"))
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
+    def test_new(self):
+        """test that new adds an object to the FileStorage.__objects attr"""
+        storage = FileStorage()
+        save = FileStorage._FileStorage__objects
+        FileStorage._FileStorage__objects = {}
+        test_dict = {}
+        for key, value in classes.items():
+            with self.subTest(key=key, value=value):
+                instance = value()
+                instance_key = instance.__class__.__name__ + "." + instance.id
+                storage.new(instance)
+                test_dict[instance_key] = instance
+                self.assertEqual(test_dict, storage._FileStorage__objects)
+        FileStorage._FileStorage__objects = save
 
-    def test_FileStorage_save_file_read(self):
-        '''
-            Testing the contents of the files inside the file.json
-        '''
-        self.storage.save()
-        self.storage.new(self.my_model)
+    @unittest.skipIf(models.storage_t == 'db', "not testing file storage")
+    def test_save(self):
+        """Test that save properly saves objects to file.json"""
+        storage = FileStorage()
+        new_dict = {}
+        for key, value in classes.items():
+            instance = value()
+            instance_key = instance.__class__.__name__ + "." + instance.id
+            new_dict[instance_key] = instance
+        save = FileStorage._FileStorage__objects
+        FileStorage._FileStorage__objects = new_dict
+        storage.save()
+        FileStorage._FileStorage__objects = save
+        for key, value in new_dict.items():
+            new_dict[key] = value.to_dict()
+        string = json.dumps(new_dict)
+        with open("file.json", "r") as f:
+            js = f.read()
+        self.assertEqual(json.loads(string), json.loads(js))
 
-        with open("file.json", encoding="UTF8") as fd:
-            content = json.load(fd)
+    @unittest.skipIf(os.getenv('HBNB_TYPE_STORAGE') == 'db',
+                     "not testing file storage")
+    def test_get(self):
+        """Test that the get method properly retrievs objects"""
+        storage = FileStorage()
+        self.assertIs(storage.get("User", "blah"), None)
+        self.assertIs(storage.get("blah", "blah"), None)
+        new_user = User()
+        new_user.save()
+        self.assertIs(storage.get("User", new_user.id), new_user)
 
-        self.assertTrue(type(content) is dict)
-
-    def test_FileStorage_the_type_file_content(self):
-        '''
-            testing the type of the contents inside the file.
-        '''
-        self.storage.save()
-        self.storage.new(self.my_model)
-
-        with open("file.json", encoding="UTF8") as fd:
-            content = fd.read()
-
-        self.assertIsInstance(content, str)
-
-    def test_FileStorage_reaload_without_file(self):
-        '''
-            Tests that nothing happens when file.json does not exists
-            and reload is called
-        '''
-
-        try:
-            self.storage.reload()
-            self.assertTrue(True)
-        except:
-            self.assertTrue(False)
-
-    def test_FileStorage_delete(self):
-        '''
-            Tests delete function works
-        '''
+    @unittest.skipIf(os.getenv('HBNB_TYPE_STORAGE') == 'db',
+                     "not testing file storage")
+    def test_count(self):
+        storage = FileStorage()
+        initial_length = len(storage.all())
+        self.assertEqual(storage.count(), initial_length)
+        state_len = len(storage.all("State"))
+        self.assertEqual(storage.count("State"), state_len)
         new_state = State()
-        key = str(new_state.__class__.__name__ + "." + new_state.id)
-        self.storage.new(new_state)
-        self.assertTrue(key in self.storage._FileStorage__objects, msg="Object wasn't saved to storage")
-        self.storage.save()
-        self.storage.delete(new_state)
-        self.storage.save()
-        self.assertTrue(key not in self.storage._FileStorage__objects, msg="Object wasn't deleted from storage")
-
-    def test_FileStorage_delete_not_in(self):
-        '''
-            Tests delete works for key not in storage
-        '''
-        new_state = State()
-        key = str(new_state.__class__.__name__ + "." + new_state.id)
-        self.storage.delete(new_state)
-        self.assertTrue(key not in self.storage._FileStorage__objects)
-
-    def test_FileStorage_delete_None(self):
-        '''
-            Tests delete function works for None - no change to __objects
-        '''
-        old_storage = self.storage._FileStorage__objects
-        self.storage.delete(None)
-        self.assertTrue(old_storage == self.storage._FileStorage__objects)
+        new_state.save()
+        self.assertEqual(storage.count(), initial_length + 1)
+        self.assertEqual(storage.count("State"), state_len + 1)
